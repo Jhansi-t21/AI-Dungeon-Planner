@@ -1,0 +1,787 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AI Dungeon Planner</title>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700;900&family=Nunito:wght@400;600;700&family=Fira+Code:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#f5f0e8;--bg2:#ede7d9;--bg3:#e2dace;
+  --panel:#faf7f2;--border:#c8bfaa;--border2:#b0a490;
+  --gold:#b87333;--gold2:#d4902a;--gold-light:#f0c060;
+  --teal:#2a7a5a;--teal2:#3db87a;
+  --red:#b83232;--red2:#e05050;
+  --purple:#6a3ab8;
+  --text:#2a2218;--text2:#5a4e3a;--text3:#8a7a60;
+  --shadow:rgba(80,60,20,.13);
+  --r:10px;
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+body{
+  font-family:'Nunito',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;
+  background-image:
+    radial-gradient(ellipse at 10% 20%,rgba(180,120,50,.06) 0%,transparent 60%),
+    radial-gradient(ellipse at 90% 80%,rgba(42,122,90,.06) 0%,transparent 60%),
+    url("data:image/svg+xml,%3Csvg width='60' height='60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='%23b87333' fill-opacity='0.035'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/svg%3E");
+}
+.app{max-width:1380px;margin:0 auto;padding:16px 14px 40px}
+
+/* HEADER */
+.hdr{text-align:center;padding:20px 0 14px;border-bottom:2px solid var(--border);margin-bottom:16px}
+.hdr h1{font-family:'Playfair Display',serif;font-size:clamp(22px,4vw,44px);font-weight:900;color:var(--gold);letter-spacing:2px;text-shadow:0 2px 8px rgba(184,115,51,.18)}
+.hdr h1 span{color:var(--teal)}
+.tagline{font-family:'Fira Code',monospace;font-size:10px;color:var(--text3);letter-spacing:4px;margin-top:4px;text-transform:uppercase}
+
+/* LEVEL BANNER */
+.lv-banner{
+  display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;
+  background:linear-gradient(135deg,var(--gold),var(--gold2));color:#fff;
+  border-radius:var(--r);padding:12px 18px;margin-bottom:14px;
+  box-shadow:0 4px 16px rgba(184,115,51,.25)
+}
+.lv-name{font-family:'Playfair Display',serif;font-size:17px;font-weight:700}
+.lv-desc{font-size:12px;opacity:.85;margin-top:2px}
+.lv-badges{display:flex;gap:7px;flex-wrap:wrap}
+.badge{background:rgba(255,255,255,.22);border:1px solid rgba(255,255,255,.35);border-radius:20px;padding:3px 11px;font-size:11px;font-weight:700;font-family:'Fira Code',monospace}
+.lv-dots{display:flex;gap:5px;flex-wrap:wrap}
+.lv-dot{
+  width:28px;height:28px;border-radius:50%;background:rgba(255,255,255,.18);border:2px solid rgba(255,255,255,.38);
+  cursor:pointer;font-family:'Fira Code',monospace;font-size:10px;color:#fff;
+  display:flex;align-items:center;justify-content:center;transition:all .2s;font-weight:700
+}
+.lv-dot:hover{background:rgba(255,255,255,.38);transform:scale(1.1)}
+.lv-dot.active{background:#fff;color:var(--gold)}
+.lv-dot.done{background:var(--teal2);color:#fff;border-color:var(--teal2)}
+
+/* MAIN GRID */
+.grid{display:grid;grid-template-columns:250px 1fr 270px;gap:14px;align-items:start}
+@media(max-width:1060px){.grid{grid-template-columns:1fr 1fr}.col-map{grid-column:1/-1;order:-1}}
+@media(max-width:660px){.grid{grid-template-columns:1fr}}
+
+/* PANEL */
+.panel{background:var(--panel);border:1.5px solid var(--border);border-radius:var(--r);overflow:hidden;box-shadow:0 2px 10px var(--shadow);margin-bottom:12px}
+.panel:last-child{margin-bottom:0}
+.ph{padding:9px 13px;background:var(--bg2);border-bottom:1.5px solid var(--border);display:flex;align-items:center;gap:7px}
+.ph h3{font-family:'Playfair Display',serif;font-size:12px;font-weight:700;color:var(--gold);letter-spacing:1px;text-transform:uppercase}
+.pb{padding:13px}
+
+/* SETUP */
+.setup-box{background:linear-gradient(135deg,#fff8ee,#f5f0e8);border:2px dashed var(--gold);border-radius:var(--r);padding:12px;margin-bottom:12px;text-align:center}
+.setup-title{font-family:'Playfair Display',serif;font-size:13px;color:var(--gold);font-weight:700;margin-bottom:4px}
+.setup-desc{font-size:11.5px;color:var(--text2);line-height:1.55;margin-bottom:9px}
+.setup-btns{display:flex;gap:7px;flex-wrap:wrap;justify-content:center}
+.sbtn{padding:6px 13px;border-radius:6px;border:2px solid;font-size:11px;font-weight:700;cursor:pointer;transition:all .17s;font-family:'Nunito',sans-serif;background:transparent}
+.sbtn-s{color:var(--teal);border-color:var(--teal)}.sbtn-s:hover,.sbtn-s.active{background:var(--teal);color:#fff}
+.sbtn-g{color:var(--gold);border-color:var(--gold)}.sbtn-g:hover,.sbtn-g.active{background:var(--gold);color:#fff}
+.sbtn-c{color:var(--red);border-color:var(--red)}.sbtn-c:hover{background:var(--red);color:#fff}
+
+/* STATS */
+.stats-g{display:grid;grid-template-columns:1fr 1fr;gap:7px;margin-bottom:11px}
+.stat{background:var(--bg2);border:1px solid var(--border);border-radius:8px;padding:9px 7px;text-align:center}
+.sl{font-family:'Fira Code',monospace;font-size:9px;letter-spacing:2px;color:var(--text3);text-transform:uppercase;margin-bottom:2px}
+.sv{font-family:'Playfair Display',serif;font-size:21px;font-weight:700;color:var(--gold);line-height:1}
+.sv.good{color:var(--teal)}.sv.bad{color:var(--red)}
+.pw{margin-bottom:11px}
+.pt{display:flex;justify-content:space-between;font-size:10px;color:var(--text3);margin-bottom:3px;font-family:'Fira Code',monospace;font-weight:500}
+.pb2{height:6px;background:var(--bg3);border-radius:3px;overflow:hidden}
+.pf{height:100%;border-radius:3px;background:linear-gradient(90deg,var(--teal),var(--teal2));transition:width .4s ease;box-shadow:0 0 5px rgba(42,180,100,.35)}
+.inv-lbl{font-size:9.5px;letter-spacing:2px;color:var(--text3);font-family:'Fira Code',monospace;text-transform:uppercase;margin-bottom:5px}
+.inv-row{display:flex;flex-wrap:wrap;gap:5px;min-height:26px}
+.chip{background:linear-gradient(135deg,#f0e8ff,#e0d0ff);border:1px solid #b090e0;border-radius:20px;padding:3px 10px;font-size:11.5px;color:var(--purple);font-weight:700;animation:pop .3s cubic-bezier(.175,.885,.32,1.275)}
+@keyframes pop{from{transform:scale(.4);opacity:0}to{transform:scale(1);opacity:1}}
+
+/* MAP */
+.map-wrap{padding:14px;background:var(--bg2);border-bottom:1.5px solid var(--border);display:flex;justify-content:center;overflow:auto}
+#dungeon-map{display:grid;gap:3px}
+.cell{border-radius:5px;display:flex;align-items:center;justify-content:center;cursor:pointer;position:relative;transition:transform .1s,box-shadow .1s;user-select:none;border:1.5px solid transparent;flex-shrink:0}
+.cell:hover{transform:scale(1.07);z-index:2}
+.cell.floor{background:#fff;border-color:#ddd5c0}
+.cell.wall{background:repeating-linear-gradient(45deg,#c0b49a,#c0b49a 3px,#b0a48a 3px,#b0a48a 8px);border-color:#a09070;cursor:not-allowed}
+.cell.wall:hover{transform:none}
+.cell.trap{background:#fff0f0;border-color:#f0a0a0}
+.cell.enemy{background:#fff0f4;border-color:#e08090}
+.cell.item{background:#f0f0ff;border-color:#a090e0}
+.cell.start{background:#edfff6;border-color:#60d090;box-shadow:0 0 7px rgba(42,180,100,.2)}
+.cell.goal{background:#fffbea;border-color:#e8c840;box-shadow:0 0 7px rgba(220,180,0,.2)}
+.cell.path{background:#e8f8f0;border-color:#80c8a0}
+.cell.visited{background:#f0f8f4;border-color:#c0ddd0}
+.cell.agent{background:#e0fff0;border-color:var(--teal2);box-shadow:0 0 12px rgba(42,180,100,.45);animation:ap .9s ease-in-out infinite;z-index:3}
+@keyframes ap{0%,100%{box-shadow:0 0 10px rgba(42,180,100,.4)}50%{box-shadow:0 0 22px rgba(42,180,100,.75)}}
+.cell.shover{outline:3px solid var(--gold);outline-offset:-2px}
+
+/* MAP CONTROLS */
+.mc{padding:11px 14px;display:flex;flex-wrap:wrap;gap:9px;align-items:center;background:var(--panel);border-bottom:1px solid var(--border)}
+.btn{font-family:'Nunito',sans-serif;font-weight:700;font-size:12px;padding:8px 16px;border-radius:7px;border:2px solid;cursor:pointer;transition:all .17s;background:transparent;display:flex;align-items:center;gap:5px}
+.btn-gold{color:var(--gold);border-color:var(--gold)}.btn-gold:hover{background:var(--gold);color:#fff;box-shadow:0 4px 12px rgba(184,115,51,.28)}
+.btn-teal{color:var(--teal);border-color:var(--teal)}.btn-teal:hover{background:var(--teal);color:#fff;box-shadow:0 4px 12px rgba(42,122,90,.28)}
+.btn-red{color:var(--red);border-color:var(--red)}.btn-red:hover{background:var(--red);color:#fff;box-shadow:0 4px 12px rgba(180,50,50,.28)}
+.btn:disabled{opacity:.38;cursor:not-allowed}
+.btn:not(:disabled):active{transform:scale(.96)}
+.spd{margin-left:auto;display:flex;align-items:center;gap:7px;font-size:12px;color:var(--text3);font-weight:600}
+.spd input{accent-color:var(--gold);width:75px}
+
+/* STATUS */
+.sbar{padding:8px 14px;font-family:'Fira Code',monospace;font-size:10.5px;letter-spacing:2px;text-align:center;background:var(--bg2);border-top:1px solid var(--border);font-weight:500}
+.s-idle{color:var(--text3)}.s-setup{color:var(--purple)}.s-planning{color:var(--gold2)}
+.s-running{color:var(--teal)}.s-success{color:var(--teal);font-weight:700}.s-failed{color:var(--red);font-weight:700}.s-blocked{color:var(--red)}
+
+/* LOG */
+.log-wrap{max-height:210px;overflow-y:auto}
+.le{display:flex;align-items:flex-start;gap:7px;padding:5px 7px;border-radius:5px;margin-bottom:2px;font-size:12px;transition:background .2s}
+.le.active{background:rgba(42,122,90,.1);border-left:3px solid var(--teal);padding-left:5px}
+.ln{font-family:'Fira Code',monospace;font-size:9.5px;color:var(--text3);min-width:22px;padding-top:1px}
+.lt{flex:1;color:var(--text2)}.lf{font-size:13px}
+.le-empty{text-align:center;color:var(--text3);font-style:italic;padding:16px 0;font-size:12px}
+
+/* THINK BOX */
+.think{background:#f0fff8;border:1.5px solid #a0d8b8;border-radius:7px;padding:11px;font-family:'Fira Code',monospace;font-size:10.5px;line-height:1.8;color:var(--teal);min-height:75px;white-space:pre-line}
+.think .cur{display:inline-block;width:6px;height:12px;background:var(--teal2);animation:bl .7s step-end infinite;vertical-align:middle;margin-left:2px;border-radius:1px}
+@keyframes bl{0%,100%{opacity:1}50%{opacity:0}}
+
+/* LEGEND */
+.leg-g{display:grid;grid-template-columns:1fr 1fr;gap:5px}
+.li{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--text2)}
+.lc{width:26px;height:26px;border-radius:4px;display:flex;align-items:center;justify-content:center;font-size:13px;border:1.5px solid;flex-shrink:0}
+
+/* HOW IT WORKS */
+.how{grid-column:1/-1;background:var(--panel);border:1.5px solid var(--border);border-radius:var(--r);overflow:hidden;box-shadow:0 2px 10px var(--shadow);margin-top:4px}
+.how-cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(175px,1fr))}
+.hc{padding:16px 14px;border-right:1px solid var(--border)}
+.hc:last-child{border-right:none}
+.hn{font-family:'Playfair Display',serif;font-size:30px;color:var(--border2);margin-bottom:5px;line-height:1}
+.ht{font-family:'Playfair Display',serif;font-size:11px;color:var(--gold);font-weight:700;text-transform:uppercase;letter-spacing:1px;margin-bottom:5px}
+.htx{font-size:11.5px;color:var(--text2);line-height:1.6}
+.htag{display:inline-block;margin-top:7px;background:var(--bg2);border:1px solid var(--border);border-radius:3px;padding:2px 6px;font-family:'Fira Code',monospace;font-size:9px;color:var(--text3)}
+
+/* MODAL */
+.modal-bg{display:none;position:fixed;inset:0;background:rgba(40,20,0,.48);z-index:500;align-items:center;justify-content:center}
+.modal-bg.show{display:flex}
+.modal{background:var(--panel);border:2px solid var(--gold);border-radius:14px;padding:28px 36px;text-align:center;box-shadow:0 12px 48px rgba(184,115,51,.28);max-width:360px;width:90%;animation:mi .4s cubic-bezier(.175,.885,.32,1.275)}
+@keyframes mi{from{transform:scale(.7);opacity:0}to{transform:scale(1);opacity:1}}
+.modal h2{font-family:'Playfair Display',serif;font-size:26px;color:var(--gold);margin-bottom:8px}
+.modal p{color:var(--text2);font-size:13px;line-height:1.65;margin-bottom:16px}
+.ms{display:grid;grid-template-columns:1fr 1fr;gap:9px;margin-bottom:16px}
+.ms-s{background:var(--bg2);border-radius:7px;padding:9px}
+.ms-l{font-size:9.5px;color:var(--text3);font-family:'Fira Code',monospace;letter-spacing:2px;margin-bottom:2px}
+.ms-v{font-family:'Playfair Display',serif;font-size:19px;font-weight:700;color:var(--gold)}
+.mbtns{display:flex;gap:9px;justify-content:center}
+
+/* TOAST */
+#toast{position:fixed;bottom:26px;left:50%;transform:translateX(-50%) translateY(80px);background:var(--panel);border:2px solid var(--gold);border-radius:28px;padding:9px 24px;font-weight:700;font-size:12.5px;color:var(--gold);box-shadow:0 6px 22px rgba(184,115,51,.18);transition:transform .35s cubic-bezier(.175,.885,.32,1.275);z-index:999;white-space:nowrap}
+#toast.show{transform:translateX(-50%) translateY(0)}
+
+::-webkit-scrollbar{width:4px;height:4px}
+::-webkit-scrollbar-thumb{background:var(--border2);border-radius:3px}
+</style>
+</head>
+<body>
+<div class="app">
+
+  <div class="hdr">
+    <h1>⚔ AI <span>Dungeon</span> Planner</h1>
+    <div class="tagline">STRIPS · A* State-Space Search · Heuristic Planning</div>
+  </div>
+
+  <div class="lv-banner">
+    <div><div class="lv-name" id="lv-name">—</div><div class="lv-desc" id="lv-desc">—</div></div>
+    <div class="lv-dots" id="lv-dots"></div>
+    <div class="lv-badges">
+      <div class="badge" id="b-diff">—</div>
+      <div class="badge" id="b-size">—</div>
+      <div class="badge" id="b-req">—</div>
+    </div>
+  </div>
+
+  <div class="grid">
+
+    <!-- LEFT -->
+    <div>
+      <div class="panel">
+        <div class="ph"><span>🎯</span><h3>Set Start &amp; Goal</h3></div>
+        <div class="pb">
+          <div class="setup-box">
+            <div class="setup-title">Click cells on the map</div>
+            <div class="setup-desc" id="setup-info">Choose a mode, then click any walkable map cell.</div>
+            <div class="setup-btns">
+              <button class="sbtn sbtn-s" id="bms" onclick="setMode('start')">🟢 Start</button>
+              <button class="sbtn sbtn-g" id="bmg" onclick="setMode('goal')">🏆 Goal</button>
+              <button class="sbtn sbtn-c"           onclick="clearSG()">✕ Reset</button>
+            </div>
+          </div>
+          <div class="stats-g">
+            <div class="stat"><div class="sl">Health</div><div class="sv good" id="sv-hp">100</div></div>
+            <div class="stat"><div class="sl">Steps</div><div class="sv" id="sv-steps">0</div></div>
+            <div class="stat"><div class="sl">Gems</div><div class="sv" id="sv-gems">0/0</div></div>
+            <div class="stat"><div class="sl">Plan Cost</div><div class="sv" id="sv-cost">—</div></div>
+          </div>
+          <div class="pw">
+            <div class="pt"><span>PROGRESS</span><span id="pct-txt">0%</span></div>
+            <div class="pb2"><div class="pf" id="pf" style="width:0%"></div></div>
+          </div>
+          <div class="inv-lbl">Inventory</div>
+          <div class="inv-row" id="inv-row"><span style="color:var(--text3);font-size:12px;font-style:italic">Empty</span></div>
+        </div>
+      </div>
+      <div class="panel">
+        <div class="ph"><span>🗺</span><h3>Legend</h3></div>
+        <div class="pb">
+          <div class="leg-g">
+            <div class="li"><div class="lc" style="background:#edfff6;border-color:#60d090">🟢</div>Start</div>
+            <div class="li"><div class="lc" style="background:#fffbea;border-color:#e8c840">🏆</div>Goal</div>
+            <div class="li"><div class="lc" style="background:#f0f0ff;border-color:#a090e0">💎</div>Gem</div>
+            <div class="li"><div class="lc" style="background:#fff0f0;border-color:#f0a0a0">🔥</div>Trap −25hp</div>
+            <div class="li"><div class="lc" style="background:#fff0f4;border-color:#e08090">👹</div>Enemy −40hp</div>
+            <div class="li"><div class="lc" style="background:#e2dace;border-color:#a09070">🪨</div>Wall</div>
+            <div class="li"><div class="lc" style="background:#e8f8f0;border-color:#80c8a0">·</div>AI Path</div>
+            <div class="li"><div class="lc" style="background:#e0fff0;border-color:#60d090">🧙</div>Agent</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- MAP -->
+    <div class="panel col-map">
+      <div class="ph"><span>⚔</span><h3 id="map-title">Dungeon Map</h3></div>
+      <div class="map-wrap"><div id="dungeon-map"></div></div>
+      <div class="mc">
+        <button class="btn btn-gold" id="btn-plan"  onclick="doPlan()">◈ Plan Route</button>
+        <button class="btn btn-teal" id="btn-run"   onclick="doRun()" disabled>▶ Execute</button>
+        <button class="btn btn-red"  id="btn-reset" onclick="doReset()">↺ Reset</button>
+        <div class="spd"><span>Speed</span><input type="range" id="spd-sl" min="1" max="5" value="3"></div>
+      </div>
+      <div class="sbar s-idle" id="sbar">⬡ SET START &amp; GOAL, THEN CLICK ◈ PLAN ROUTE</div>
+    </div>
+
+    <!-- RIGHT -->
+    <div>
+      <div class="panel">
+        <div class="ph"><span>📜</span><h3>Action Plan</h3></div>
+        <div class="pb" style="padding:9px 11px">
+          <div class="log-wrap" id="alog"><div class="le-empty">No plan yet. Set start &amp; goal, then click ◈ Plan Route.</div></div>
+        </div>
+      </div>
+      <div class="panel">
+        <div class="ph"><span>🧠</span><h3>AI Reasoning</h3></div>
+        <div class="pb"><div class="think" id="think">Awaiting...<span class="cur"></span></div></div>
+      </div>
+    </div>
+
+    <!-- HOW IT WORKS -->
+    <div class="how">
+      <div class="ph"><span>⚙</span><h3>How the AI Planner Works</h3></div>
+      <div class="how-cards">
+        <div class="hc"><div class="hn">01</div><div class="ht">STRIPS Actions</div><div class="htx">Every move has formal preconditions, add-effects &amp; delete-effects. Only valid chains of actions are explored.</div><div class="htag">STRIPS/PDDL</div></div>
+        <div class="hc"><div class="hn">02</div><div class="ht">A* Search</div><div class="htx">Searches over world states (position + inventory + HP) using f(n)=g(n)+h(n). Guarantees optimal plan before any move.</div><div class="htag">f(n) = g(n)+h(n)</div></div>
+        <div class="hc"><div class="hn">03</div><div class="ht">Heuristic h(n)</div><div class="htx">h = Manhattan distance to goal + uncollected gems×4 + HP risk penalty. Admissible → A* is always optimal.</div><div class="htag">ADMISSIBLE</div></div>
+        <div class="hc"><div class="hn">04</div><div class="ht">Threat Avoidance</div><div class="htx">Traps cost +27, enemies +46. Planner routes around hazards automatically unless walls force a crossing.</div><div class="htag">COST-SENSITIVE</div></div>
+        <div class="hc"><div class="hn">05</div><div class="ht">Deliberate Agent</div><div class="htx">The AI computes the full plan before taking a single step — every action is globally optimal, not just locally greedy.</div><div class="htag">DELIBERATIVE</div></div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- MODAL -->
+<div class="modal-bg" id="modal">
+  <div class="modal">
+    <h2 id="m-title">🏆 Level Complete!</h2>
+    <p id="m-body">Agent successfully completed the level!</p>
+    <div class="ms">
+      <div class="ms-s"><div class="ms-l">STEPS</div><div class="ms-v" id="ms-steps">0</div></div>
+      <div class="ms-s"><div class="ms-l">HP LEFT</div><div class="ms-v" id="ms-hp">0</div></div>
+      <div class="ms-s"><div class="ms-l">GEMS</div><div class="ms-v" id="ms-gems">0/0</div></div>
+      <div class="ms-s"><div class="ms-l">PLAN COST</div><div class="ms-v" id="ms-cost">0</div></div>
+    </div>
+    <div class="mbtns">
+      <button class="btn btn-teal" id="m-next" onclick="nextLevel()">Next Level ▶</button>
+      <button class="btn btn-gold" onclick="closeModal()">Stay Here</button>
+    </div>
+  </div>
+</div>
+<div id="toast"></div>
+
+<script>
+/* ═══════════════════════════════════
+   CELL TYPES
+═══════════════════════════════════ */
+const E=0,W=1,T=2,N=3,I=4;
+
+/* ═══════════════════════════════════
+   10 LEVELS
+═══════════════════════════════════ */
+const LEVELS=[
+{name:"Level 1 — The Forgotten Crypt",desc:"Collect all gems and reach the exit.",diff:"★☆☆ EASY",req:"COLLECT ALL GEMS",rows:9,cols:11,hpStart:100,mustAll:true,
+ dS:{r:0,c:0},dG:{r:8,c:10},
+ grid:[[E,E,E,W,E,E,E,W,E,E,E],[E,W,E,W,E,W,E,E,E,W,E],[E,W,E,E,I,E,W,E,E,E,E],[E,E,W,W,E,E,E,T,E,W,E],[E,T,E,E,E,W,E,E,W,E,E],[E,E,W,I,E,E,N,E,E,E,E],[E,W,E,E,W,E,E,E,W,E,I],[E,E,E,T,E,E,W,E,E,W,E],[E,E,W,E,E,N,E,E,E,E,E]]},
+{name:"Level 2 — Halls of Ember",desc:"Navigate through fire corridors.",diff:"★☆☆ EASY+",req:"COLLECT GEMS, AVOID TRAPS",rows:9,cols:11,hpStart:100,mustAll:true,
+ dS:{r:0,c:0},dG:{r:8,c:10},
+ grid:[[E,E,W,E,E,E,W,E,E,E,E],[E,T,W,E,W,E,E,E,W,T,E],[E,E,E,E,W,I,E,W,E,E,E],[W,E,W,E,E,E,E,E,W,E,E],[E,E,E,T,W,E,W,E,E,E,E],[E,W,E,E,E,N,E,E,T,W,E],[E,E,I,W,E,E,E,W,E,E,E],[T,E,E,E,W,E,E,E,E,N,E],[E,E,E,E,E,E,W,E,I,E,E]]},
+{name:"Level 3 — The Spider Nest",desc:"Enemies lurk around every corner.",diff:"★★☆ MEDIUM",req:"SURVIVE ENEMY ENCOUNTERS",rows:9,cols:13,hpStart:120,mustAll:true,
+ dS:{r:0,c:0},dG:{r:8,c:12},
+ grid:[[E,E,E,W,E,E,E,E,W,E,E,E,E],[E,W,E,E,E,W,E,W,E,E,W,E,E],[E,N,W,E,I,E,E,E,E,T,E,W,E],[E,E,E,W,E,W,E,N,W,E,E,E,E],[W,E,T,E,E,E,W,E,E,E,T,E,E],[E,E,W,E,W,I,E,E,W,E,E,W,E],[E,T,E,E,E,N,W,E,E,E,I,E,E],[E,W,E,W,E,E,E,W,E,N,E,E,E],[E,E,E,E,E,T,E,E,E,E,W,E,E]]},
+{name:"Level 4 — Labyrinth of Shadows",desc:"Complex walls force creative routing.",diff:"★★☆ MEDIUM",req:"NAVIGATE THE LABYRINTH",rows:10,cols:13,hpStart:120,mustAll:true,
+ dS:{r:0,c:0},dG:{r:9,c:12},
+ grid:[[E,E,E,E,W,E,E,E,E,W,E,E,E],[W,W,E,W,W,E,W,W,E,E,E,W,E],[E,E,E,E,E,E,E,E,W,T,E,E,E],[E,W,W,W,W,E,W,W,W,E,W,W,E],[E,E,E,I,E,E,E,N,E,E,E,E,E],[W,W,E,W,E,W,W,W,E,W,W,E,E],[E,E,E,E,E,E,E,I,E,E,E,W,E],[E,W,T,W,W,E,W,W,W,E,W,W,E],[E,E,E,E,E,I,E,E,E,N,E,E,E],[E,W,W,E,W,W,E,T,W,W,E,E,E]]},
+{name:"Level 5 — The Gauntlet",desc:"High enemy density. Every move counts.",diff:"★★☆ MED-HARD",req:"SURVIVE THE GAUNTLET",rows:10,cols:13,hpStart:150,mustAll:true,
+ dS:{r:0,c:0},dG:{r:9,c:12},
+ grid:[[E,E,W,E,E,E,W,E,E,E,E,E,E],[E,N,E,E,W,T,E,W,E,N,E,W,E],[W,E,E,W,E,E,E,E,W,E,E,E,I],[E,E,T,E,N,W,E,E,E,E,T,W,E],[E,W,E,E,E,E,W,N,E,W,E,E,E],[E,E,E,W,T,E,E,E,E,E,W,E,E],[E,N,W,E,E,E,N,W,T,E,E,E,I],[E,E,E,T,W,E,E,E,W,N,E,W,E],[E,W,E,E,E,I,E,W,E,E,E,E,E],[E,E,E,W,E,E,E,E,W,T,N,E,E]]},
+{name:"Level 6 — Frozen Vault",desc:"Dense walls, limited routes. Think ahead.",diff:"★★★ HARD",req:"FIND THE HIDDEN PATH",rows:11,cols:13,hpStart:150,mustAll:true,
+ dS:{r:0,c:0},dG:{r:10,c:12},
+ grid:[[E,E,W,E,E,W,E,E,W,E,E,E,E],[E,W,W,E,W,E,E,W,E,E,W,E,E],[E,E,E,E,E,T,W,E,E,N,E,W,I],[W,E,W,W,E,E,E,W,W,E,E,E,E],[E,E,E,E,W,N,E,E,E,W,T,E,E],[E,W,T,E,E,E,W,I,E,E,E,W,E],[E,E,W,W,E,T,E,E,W,E,N,E,E],[E,N,E,E,E,W,W,E,E,E,E,W,E],[W,E,W,I,E,E,E,W,E,T,E,E,E],[E,E,E,W,N,W,E,E,E,E,W,E,E],[E,W,E,E,E,E,W,T,E,N,E,E,E]]},
+{name:"Level 7 — The Abyss Corridor",desc:"Long passages. Enemy-heavy terrain.",diff:"★★★ HARD",req:"NAVIGATE LONG CORRIDORS",rows:11,cols:15,hpStart:180,mustAll:true,
+ dS:{r:0,c:0},dG:{r:10,c:14},
+ grid:[[E,E,E,W,E,E,E,W,E,E,E,W,E,E,E],[E,W,E,W,E,W,E,E,E,W,E,E,E,W,E],[E,E,E,E,I,E,W,N,E,E,W,E,E,E,E],[W,E,W,W,E,E,E,E,W,E,E,W,E,T,E],[E,E,E,E,W,N,E,W,E,E,E,E,I,E,E],[E,T,W,E,E,E,W,E,E,N,W,E,E,E,E],[E,E,E,W,E,I,E,E,W,E,E,E,W,N,E],[E,W,E,E,E,W,T,E,E,E,W,E,E,E,E],[E,E,T,E,W,E,E,W,E,N,E,W,I,E,E],[E,W,E,E,E,N,W,E,E,E,E,E,W,E,E],[E,E,E,W,T,E,E,E,W,E,T,N,E,E,E]]},
+{name:"Level 8 — Cursed Catacomb",desc:"Traps and enemies everywhere. Survive!",diff:"🔥 VERY HARD",req:"SURVIVE WITH 1+ HP",rows:11,cols:15,hpStart:200,mustAll:false,
+ dS:{r:0,c:0},dG:{r:10,c:14},
+ grid:[[E,E,T,E,W,E,E,E,W,T,E,E,E,E,E],[E,W,E,N,W,E,W,T,E,E,E,W,E,N,E],[T,E,W,E,E,I,E,E,W,E,E,E,T,W,E],[E,N,E,W,E,E,T,W,E,N,E,W,E,E,E],[E,E,W,E,N,W,E,E,E,T,W,E,I,E,E],[E,T,E,E,W,E,N,E,W,E,E,N,E,W,E],[E,E,E,T,E,W,E,E,E,W,T,E,E,E,I],[N,W,E,E,N,E,W,T,E,E,E,W,N,E,E],[E,E,T,W,E,E,E,N,W,T,E,E,E,W,E],[E,W,E,E,W,N,E,E,E,E,W,E,N,E,T],[E,E,E,T,E,E,W,E,N,E,E,T,E,E,E]]},
+{name:"Level 9 — The Obsidian Maze",desc:"Master-level maze. Every cell matters.",diff:"💀 EXPERT",req:"PERFECT ROUTE REQUIRED",rows:12,cols:15,hpStart:200,mustAll:true,
+ dS:{r:0,c:0},dG:{r:11,c:14},
+ grid:[[E,E,W,E,E,E,W,E,E,W,E,E,E,E,E],[E,W,W,E,W,E,E,E,W,W,E,W,T,E,E],[E,E,E,I,W,N,W,E,E,E,E,E,W,N,E],[W,W,E,W,E,E,E,W,W,N,E,W,E,E,E],[E,E,E,E,T,W,E,E,E,E,W,E,I,W,E],[E,W,T,W,W,E,N,W,E,T,E,E,E,E,E],[E,E,E,E,E,N,W,E,W,E,E,W,E,N,E],[E,W,W,E,W,W,E,E,E,W,T,W,E,E,I],[E,E,E,T,E,E,E,W,E,N,E,E,W,W,E],[W,E,W,W,E,N,W,E,E,E,E,W,E,E,T],[E,E,E,E,W,T,E,E,W,N,E,E,I,W,E],[E,W,T,E,E,E,W,E,E,E,T,N,E,E,E]]},
+{name:"Level 10 — The Dragon's Lair",desc:"BOSS LEVEL. Maximum complexity. Prove your mastery.",diff:"⚡ BOSS LEVEL",req:"ALL GEMS + SURVIVE",rows:12,cols:17,hpStart:250,mustAll:true,
+ dS:{r:0,c:0},dG:{r:11,c:16},
+ grid:[[E,E,E,W,E,E,E,W,E,E,E,W,E,E,E,E,E],[E,W,E,W,E,W,T,E,E,W,E,E,E,W,N,E,E],[E,E,I,E,E,E,W,N,E,E,W,E,T,E,E,W,E],[W,E,W,W,T,E,E,E,W,N,E,W,E,E,N,E,E],[E,E,E,E,W,N,W,E,E,E,W,E,I,W,E,T,E],[E,W,T,W,E,E,E,W,T,E,E,N,E,E,W,E,E],[E,E,E,E,E,T,W,E,W,N,E,W,E,E,E,W,I],[N,W,E,N,W,E,E,E,E,W,T,E,N,W,E,E,E],[E,E,W,E,E,W,N,T,W,E,E,E,W,E,E,N,E],[E,W,E,T,E,E,W,E,E,W,N,E,E,W,T,E,E],[E,E,E,W,I,N,E,W,T,E,E,W,E,N,E,E,I],[E,T,W,E,E,E,W,E,N,E,T,E,E,E,W,N,E]]},
+];
+
+/* ═══════════════════════════════════
+   GAME STATE
+═══════════════════════════════════ */
+let lvIdx=0, lvData, grid, startPos, goalPos, agentPos;
+let health, steps, collectedItems, allItems;
+let planSteps, planIdx, runTimer, setupMode=null;
+let completedLevels=new Set();
+
+/* ═══════════════════════════════════
+   INIT
+═══════════════════════════════════ */
+function init(){
+  lvData=LEVELS[lvIdx];
+  // deep copy grid
+  grid=lvData.grid.map(r=>[...r]);
+  // collect all item positions
+  allItems=[];
+  for(let r=0;r<lvData.rows;r++)
+    for(let c=0;c<lvData.cols;c++)
+      if(grid[r][c]===I) allItems.push({r,c,id:'💎'+['Ⅰ','Ⅱ','Ⅲ','Ⅳ','Ⅴ','Ⅵ','Ⅶ','Ⅷ'][allItems.length]||'★'});
+
+  startPos={...lvData.dS};
+  goalPos ={...lvData.dG};
+  agentPos={...startPos};
+  health  =lvData.hpStart;
+  steps   =0;
+  collectedItems=[];
+  planSteps=null;
+  planIdx  =0;
+  setupMode=null;
+  clearTimeout(runTimer);
+
+  updateLvUI();
+  updateStats();
+  renderMap();
+  setSbar('idle','⬡ SET START & GOAL, THEN CLICK ◈ PLAN ROUTE');
+  setThink('Level loaded.\nSet your start (🟢) and goal (🏆),\nthen press ◈ Plan Route.\n\nThe AI will compute the optimal path\nusing A* over the full state-space.');
+  document.getElementById('alog').innerHTML='<div class="le-empty">No plan yet. Set start &amp; goal, then click ◈ Plan Route.</div>';
+  document.getElementById('btn-run').disabled=true;
+  document.getElementById('btn-plan').disabled=false;
+  document.getElementById('btn-reset').disabled=false;
+  document.getElementById('pf').style.width='0%';
+  document.getElementById('pct-txt').textContent='0%';
+  document.getElementById('sv-cost').textContent='—';
+}
+
+function updateLvUI(){
+  const lv=LEVELS[lvIdx];
+  document.getElementById('lv-name').textContent=lv.name;
+  document.getElementById('lv-desc').textContent=lv.desc;
+  document.getElementById('b-diff').textContent =lv.diff;
+  document.getElementById('b-size').textContent =`${lv.rows}×${lv.cols}`;
+  document.getElementById('b-req').textContent  =lv.req;
+  document.getElementById('map-title').textContent=`Map — ${lv.name}`;
+  const dots=document.getElementById('lv-dots');
+  dots.innerHTML='';
+  LEVELS.forEach((_,i)=>{
+    const d=document.createElement('div');
+    d.className='lv-dot';
+    if(i===lvIdx) d.classList.add('active');
+    else if(completedLevels.has(i)) d.classList.add('done');
+    d.textContent=i+1;
+    d.title=LEVELS[i].name;
+    d.onclick=()=>{lvIdx=i;init();};
+    dots.appendChild(d);
+  });
+}
+
+/* ═══════════════════════════════════
+   RENDER MAP
+═══════════════════════════════════ */
+function renderMap(pathSet=new Set(),visitedSet=new Set()){
+  const lv=lvData;
+  const map=document.getElementById('dungeon-map');
+  const maxW=Math.min(window.innerWidth-320,820);
+  const sz=Math.max(28,Math.min(52,Math.floor((maxW-lv.cols*3)/lv.cols)));
+  map.style.gridTemplateColumns=`repeat(${lv.cols},${sz}px)`;
+  map.innerHTML='';
+  for(let r=0;r<lv.rows;r++){
+    for(let c=0;c<lv.cols;c++){
+      const d=document.createElement('div');
+      d.className='cell';
+      d.style.width=d.style.height=sz+'px';
+      d.style.fontSize=Math.max(12,sz-16)+'px';
+      const key=`${r},${c}`;
+      const ct=grid[r][c];
+      const isStart=startPos&&startPos.r===r&&startPos.c===c;
+      const isGoal =goalPos &&goalPos.r===r &&goalPos.c===c;
+      const isAgent=agentPos&&agentPos.r===r&&agentPos.c===c;
+
+      if(ct===W){
+        d.classList.add('wall');d.textContent='🪨';
+      } else {
+        if(isAgent)      d.classList.add('agent');
+        else if(isGoal)  d.classList.add('goal');
+        else if(isStart) d.classList.add('start');
+        else if(pathSet.has(key))    d.classList.add('path');
+        else if(visitedSet.has(key)) d.classList.add('visited');
+        else if(ct===T)  d.classList.add('trap');
+        else if(ct===N)  d.classList.add('enemy');
+        else if(ct===I)  d.classList.add('item');
+        else             d.classList.add('floor');
+
+        if(isAgent)           d.textContent='🧙';
+        else if(isGoal)       d.textContent='🏆';
+        else if(isStart)      d.textContent='🟢';
+        else if(ct===T)       d.textContent='🔥';
+        else if(ct===N)       d.textContent='👹';
+        else if(ct===I)       d.textContent='💎';
+        else if(pathSet.has(key)) d.textContent='·';
+        else                  d.textContent='';
+
+        if(setupMode) d.classList.add('shover');
+        d.onclick=()=>onCell(r,c);
+      }
+      map.appendChild(d);
+    }
+  }
+}
+
+/* ═══════════════════════════════════
+   SETUP
+═══════════════════════════════════ */
+function setMode(m){
+  setupMode=m;
+  document.getElementById('bms').classList.toggle('active',m==='start');
+  document.getElementById('bmg').classList.toggle('active',m==='goal');
+  document.getElementById('setup-info').textContent=
+    m==='start'?'Click any walkable cell to set the START position.':
+                'Click any walkable cell to set the GOAL position.';
+  setSbar('setup',m==='start'?'🟢 CLICK A CELL TO SET START':'🏆 CLICK A CELL TO SET GOAL');
+  renderMap();
+}
+
+function onCell(r,c){
+  if(!setupMode) return;
+  if(grid[r][c]===W){toast('❌ Cannot place on a wall!');return;}
+  if(setupMode==='start'){
+    startPos={r,c};agentPos={r,c};
+    setupMode=null;
+    document.getElementById('bms').classList.remove('active');
+    document.getElementById('setup-info').textContent=`Start set at (${r},${c}). Now set the Goal.`;
+    toast('🟢 Start set!');
+  } else {
+    if(startPos&&r===startPos.r&&c===startPos.c){toast('❌ Goal must differ from start!');return;}
+    goalPos={r,c};setupMode=null;
+    document.getElementById('bmg').classList.remove('active');
+    document.getElementById('setup-info').textContent=`Goal set at (${r},${c}). Ready to plan!`;
+    toast('🏆 Goal set!');
+  }
+  planSteps=null;
+  document.getElementById('btn-run').disabled=true;
+  setSbar('idle','⬡ START & GOAL SET — CLICK ◈ PLAN ROUTE');
+  renderMap();
+}
+
+function clearSG(){
+  startPos={...lvData.dS};goalPos={...lvData.dG};agentPos={...startPos};
+  setupMode=null;
+  document.getElementById('bms').classList.remove('active');
+  document.getElementById('bmg').classList.remove('active');
+  document.getElementById('setup-info').textContent='Positions reset to defaults.';
+  planSteps=null;document.getElementById('btn-run').disabled=true;
+  renderMap();toast('↺ Positions reset');
+}
+
+/* ═══════════════════════════════════
+   A* PLANNER
+═══════════════════════════════════ */
+function doPlan(){
+  if(!startPos||!goalPos){toast('❌ Set start and goal first!');return;}
+  setupMode=null;
+  setSbar('planning','◈ COMPUTING OPTIMAL PLAN...');
+  setThink('Initializing A* planner...\nBuilding state-space graph...\nComputing heuristic...');
+  document.getElementById('btn-plan').disabled=true;
+  document.getElementById('btn-run').disabled=true;
+
+  setTimeout(()=>{
+    // Gather remaining items (only uncollected ones still in grid)
+    const remItems=[];
+    for(let r=0;r<lvData.rows;r++)
+      for(let c=0;c<lvData.cols;c++)
+        if(grid[r][c]===I) remItems.push({r,c});
+
+    const GR=goalPos.r, GC=goalPos.c;
+
+    function cost(r,c){
+      if(grid[r][c]===W) return Infinity;
+      if(grid[r][c]===T) return 27;
+      if(grid[r][c]===N) return 46;
+      return 1;
+    }
+
+    function h(r,c,inv){
+      let d=Math.abs(r-GR)+Math.abs(c-GC);
+      for(const it of remItems) if(!inv.has(`${it.r},${it.c}`)) d+=4;
+      return d;
+    }
+
+    const startInv=new Set(collectedItems.map(x=>`${x.r},${x.c}`));
+    const s0={r:startPos.r,c:startPos.c,inv:startInv,hp:health,g:0,path:[{r:startPos.r,c:startPos.c}]};
+    s0.h=h(s0.r,s0.c,s0.inv);s0.f=s0.g+s0.h;
+
+    function skey(s){return `${s.r},${s.c}|${[...s.inv].sort().join(';')}`;}
+    const open=[s0], closed=new Map();
+    let explored=0, best=null;
+
+    while(open.length>0){
+      open.sort((a,b)=>a.f-b.f||a.h-b.h);
+      const cur=open.shift();
+      const k=skey(cur);
+      if(closed.has(k)&&closed.get(k)<=cur.g) continue;
+      closed.set(k,cur.g);explored++;
+
+      const allGot=!lvData.mustAll||remItems.every(it=>cur.inv.has(`${it.r},${it.c}`));
+      if(cur.r===GR&&cur.c===GC&&allGot){best=cur;break;}
+      if(explored>10000) break;
+
+      for(const [dr,dc] of [[-1,0],[1,0],[0,-1],[0,1]]){
+        const nr=cur.r+dr,nc=cur.c+dc;
+        if(nr<0||nr>=lvData.rows||nc<0||nc>=lvData.cols) continue;
+        const cc=cost(nr,nc);
+        if(cc===Infinity) continue;
+        let nhp=cur.hp;
+        if(grid[nr][nc]===T) nhp-=25;
+        if(grid[nr][nc]===N) nhp-=40;
+        if(nhp<=0) continue;
+        const ni=new Set(cur.inv);
+        if(grid[nr][nc]===I) ni.add(`${nr},${nc}`);
+        const ns={r:nr,c:nc,inv:ni,hp:nhp,g:cur.g+cc,path:[...cur.path,{r:nr,c:nc}]};
+        ns.h=h(ns.r,ns.c,ns.inv);ns.f=ns.g+ns.h;
+        const nk=skey(ns);
+        if(!closed.has(nk)||closed.get(nk)>ns.g) open.push(ns);
+      }
+    }
+
+    if(!best){
+      setSbar('blocked','⛔ NO VALID PLAN FOUND');
+      setThink(`A* explored ${explored} states.\n⚠ No path found!\n\nTry:\n• Different start/goal positions\n• Use ↺ Reset to restore defaults\n• Try another level`);
+      document.getElementById('btn-plan').disabled=false;
+      toast('❌ No path — try different positions');
+      return;
+    }
+
+    // Build action list
+    const path=best.path;
+    planSteps=[];
+    const simInv=new Set(startInv);
+
+    for(let i=1;i<path.length;i++){
+      const fr=path[i-1],to=path[i];
+      const dr=to.r-fr.r,dc=to.c-fr.c;
+      const dir=dr===-1?'NORTH':dr===1?'SOUTH':dc===-1?'WEST':'EAST';
+      const ct=grid[to.r][to.c];
+      const ck=`${to.r},${to.c}`;
+      let name,fx='';
+      if(ct===I&&!simInv.has(ck)){
+        simInv.add(ck);
+        const it=allItems.find(x=>x.r===to.r&&x.c===to.c);
+        name=`COLLECT gem at (${to.r},${to.c})`;fx=`+gem ${it?it.id:'💎'}`;
+      } else if(ct===T){
+        name=`MOVE ${dir} [TRAP] → (${to.r},${to.c})`;fx='−25 hp';
+      } else if(ct===N){
+        name=`FIGHT ${dir} [ENEMY] → (${to.r},${to.c})`;fx='−40 hp';
+      } else if(to.r===GR&&to.c===GC){
+        name=`REACH GOAL (${to.r},${to.c})`;fx='🏆';
+      } else {
+        name=`MOVE ${dir} → (${to.r},${to.c})`;
+      }
+      planSteps.push({pos:{r:to.r,c:to.c},name,fx,cost:cost(to.r,to.c)});
+    }
+
+    planIdx=0;
+    document.getElementById('sv-cost').textContent=best.g;
+    renderLog(planSteps);
+    const pathR=new Set(path.slice(1,-1).map(p=>`${p.r},${p.c}`));
+    renderMap(pathR,new Set());
+    document.getElementById('btn-run').disabled=false;
+    document.getElementById('btn-plan').disabled=false;
+
+    const danger=planSteps.filter(s=>s.fx.includes('hp')).length;
+    setSbar('planning',`◈ PLAN READY — ${planSteps.length} ACTIONS | COST ${best.g}`);
+    setThink(`A* explored ${explored} states.\nOptimal plan: ${planSteps.length} actions.\nTotal cost: ${best.g}  |  Est. final HP: ~${Math.max(0,best.hp)}\nGems in plan: ${best.inv.size}/${remItems.length}\nDanger crossings: ${danger}\n▶ Press Execute to run!`);
+    toast(`✅ Plan ready — ${planSteps.length} steps`);
+  },280);
+}
+
+/* ═══════════════════════════════════
+   EXECUTE
+═══════════════════════════════════ */
+function doRun(){
+  if(!planSteps||planIdx>=planSteps.length) return;
+  document.getElementById('btn-plan').disabled=true;
+  document.getElementById('btn-run').disabled=true;
+  document.getElementById('btn-reset').disabled=true;
+  setSbar('running','▶ EXECUTING PLAN...');
+  execStep();
+}
+
+function getDelay(){return [800,500,310,150,55][parseInt(document.getElementById('spd-sl').value)-1];}
+
+function execStep(){
+  if(planIdx>=planSteps.length){
+    document.getElementById('btn-reset').disabled=false;
+    const won=agentPos.r===goalPos.r&&agentPos.c===goalPos.c;
+    if(won){completedLevels.add(lvIdx);setSbar('success','🏆 MISSION ACCOMPLISHED!');showModal();}
+    else    setSbar('failed','💀 PLAN FAILED');
+    setThink(`Execution complete!\n${collectedItems.length}/${allItems.length} gems.\nHP: ${health}  Steps: ${steps}`);
+    updateLvUI();return;
+  }
+  const step=planSteps[planIdx];
+  agentPos={...step.pos};steps++;
+
+  // Apply effects
+  if(step.fx==='−25 hp') health=Math.max(0,health-25);
+  if(step.fx==='−40 hp') health=Math.max(0,health-40);
+
+  // Collect gem
+  if(step.fx.startsWith('+gem')){
+    const it=allItems.find(x=>x.r===step.pos.r&&x.c===step.pos.c);
+    if(it&&!collectedItems.find(x=>x.r===it.r&&x.c===it.c)){
+      collectedItems.push(it);
+      grid[step.pos.r][step.pos.c]=E; // remove from grid
+    }
+  }
+
+  updateStats();
+  hlLog(planIdx);
+
+  const visited=new Set(planSteps.slice(0,planIdx).map(s=>`${s.pos.r},${s.pos.c}`));
+  const remain =new Set(planSteps.slice(planIdx+1).map(s=>`${s.pos.r},${s.pos.c}`));
+  renderMap(remain,visited);
+
+  const pct=Math.round(((planIdx+1)/planSteps.length)*100);
+  document.getElementById('pf').style.width=pct+'%';
+  document.getElementById('pct-txt').textContent=pct+'%';
+
+  setThink(`Step ${planIdx+1}/${planSteps.length}\n→ ${step.name}\nEffect: ${step.fx||'none'}\nHP: ${health}  Gems: ${collectedItems.length}/${allItems.length}`);
+
+  if(health<=0){setSbar('failed','💀 AGENT DIED');document.getElementById('btn-reset').disabled=false;return;}
+  planIdx++;
+  runTimer=setTimeout(execStep,getDelay());
+}
+
+/* ═══════════════════════════════════
+   RESET
+═══════════════════════════════════ */
+function doReset(){
+  clearTimeout(runTimer);
+  allItems.forEach(it=>{grid[it.r][it.c]=I;});
+  agentPos={...startPos};health=lvData.hpStart;steps=0;
+  collectedItems=[];planSteps=null;planIdx=0;setupMode=null;
+  document.getElementById('btn-plan').disabled=false;
+  document.getElementById('btn-run').disabled=true;
+  document.getElementById('btn-reset').disabled=false;
+  document.getElementById('pf').style.width='0%';
+  document.getElementById('pct-txt').textContent='0%';
+  document.getElementById('sv-cost').textContent='—';
+  document.getElementById('alog').innerHTML='<div class="le-empty">No plan yet. Click ◈ Plan Route.</div>';
+  updateStats();renderMap();
+  setSbar('idle','⬡ LEVEL RESET — READY TO PLAN');
+  setThink('Level reset.\nAdjust start/goal if desired,\nthen press ◈ Plan Route.');
+}
+
+/* ═══════════════════════════════════
+   LEVEL NAV
+═══════════════════════════════════ */
+function nextLevel(){
+  closeModal();
+  if(lvIdx<LEVELS.length-1){lvIdx++;init();}
+  else toast('🎉 You completed ALL 10 levels!');
+}
+
+/* ═══════════════════════════════════
+   UI HELPERS
+═══════════════════════════════════ */
+function updateStats(){
+  document.getElementById('sv-hp').textContent=health;
+  document.getElementById('sv-hp').className='sv'+(health>60?' good':health>30?'':' bad');
+  document.getElementById('sv-steps').textContent=steps;
+  document.getElementById('sv-gems').textContent=`${collectedItems.length}/${allItems.length}`;
+  const inv=document.getElementById('inv-row');
+  if(!collectedItems.length){inv.innerHTML='<span style="color:var(--text3);font-size:12px;font-style:italic">Empty</span>';return;}
+  inv.innerHTML='';
+  collectedItems.forEach(it=>{
+    const c=document.createElement('span');c.className='chip';c.textContent=it.id;inv.appendChild(c);
+  });
+}
+
+function renderLog(steps){
+  const log=document.getElementById('alog');log.innerHTML='';
+  steps.forEach((s,i)=>{
+    const d=document.createElement('div');d.className='le';d.id=`le-${i}`;
+    const ic=s.fx.includes('hp')?'⚠':s.fx.includes('gem')?'✨':s.fx==='🏆'?'🏆':'→';
+    d.innerHTML=`<span class="ln">#${String(i+1).padStart(2,'0')}</span><span class="lt">${s.name}</span><span class="lf">${ic}</span>`;
+    log.appendChild(d);
+  });
+}
+
+function hlLog(i){
+  document.querySelectorAll('.le').forEach(el=>{el.classList.remove('active');el.style.borderLeft='';});
+  const el=document.getElementById(`le-${i}`);
+  if(el){el.classList.add('active');el.scrollIntoView({behavior:'smooth',block:'nearest'});}
+}
+
+function setSbar(cls,msg){
+  const el=document.getElementById('sbar');
+  el.className=`sbar s-${cls}`;el.textContent=msg;
+}
+
+function setThink(msg){
+  document.getElementById('think').innerHTML=msg.replace(/\n/g,'<br>')+'<span class="cur"></span>';
+}
+
+let _tt;
+function toast(msg){
+  const el=document.getElementById('toast');el.textContent=msg;el.classList.add('show');
+  clearTimeout(_tt);_tt=setTimeout(()=>el.classList.remove('show'),2600);
+}
+
+function showModal(){
+  document.getElementById('m-title').textContent='🏆 Level Complete!';
+  document.getElementById('m-body').textContent =`AI agent completed ${lvData.name}!`;
+  document.getElementById('ms-steps').textContent=steps;
+  document.getElementById('ms-hp').textContent   =health;
+  document.getElementById('ms-gems').textContent =`${collectedItems.length}/${allItems.length}`;
+  document.getElementById('ms-cost').textContent =document.getElementById('sv-cost').textContent;
+  const nb=document.getElementById('m-next');
+  nb.disabled=lvIdx>=LEVELS.length-1;
+  nb.textContent=lvIdx>=LEVELS.length-1?'🎉 All Done!':'Next Level ▶';
+  document.getElementById('modal').classList.add('show');
+}
+function closeModal(){document.getElementById('modal').classList.remove('show');}
+
+let _rt;
+window.addEventListener('resize',()=>{clearTimeout(_rt);_rt=setTimeout(()=>renderMap(),140);});
+
+// START
+init();
+</script>
+</body>
+</html>
